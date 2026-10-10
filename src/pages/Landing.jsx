@@ -177,7 +177,7 @@ export default function Landing() {
             </h1>
 
             <motion.p className="hero__lead" variants={riseVariants}>
-              Six subjects. Thirty units. One focused study space.
+               Naa Ready Dhaan Varava?
             </motion.p>
 
             <motion.div className="hero__cta" variants={riseVariants}>
