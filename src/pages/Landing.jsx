@@ -177,7 +177,7 @@ export default function Landing() {
             </h1>
 
             <motion.p className="hero__lead" variants={riseVariants}>
-               Naa Ready Dhaan Varava?
+             The Greatest Of All Time
             </motion.p>
 
             <motion.div className="hero__cta" variants={riseVariants}>
