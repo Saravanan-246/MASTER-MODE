@@ -1,0 +1,1222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+
+    <meta
+      name="theme-color"
+      content="#8f1020"
+    />
+
+    <meta
+      name="description"
+      content="Semester Study — focused learning for your semester subjects."
+    />
+
+    <title>Semester Study</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- The startup photo is the hero of the intro: fetch it first. -->
+    <link
+      rel="preload"
+      as="image"
+      href="/src/assets/focus-mode.jpg"
+      type="image/jpeg"
+      fetchpriority="high"
+    />
+
+    <!--
+      =======================================================
+      FOCUS SCENE  —  NORMAL → FOCUS → STUDY
+      =======================================================
+      One motion system, two directions:
+
+        Startup (#splash below, plain HTML so it paints before React)
+          focus-mode.jpg travels LEFT → RIGHT · "Semester Study" · Focus mode
+
+        Enter study mode (src/components/StudyModeReveal.jsx, same markup
+        with .focus--enter)
+          focus-hero.jpg travels RIGHT → LEFT · "Study mode" · Let's study
+
+      --dir flips every directional move (1 = left→right, -1 = right→left).
+      Each variant only sets its timeline (--t-* start, --d-* duration).
+      The photos are shown whole and untouched; only their frame moves.
+    -->
+    <style>
+      @property --focus-pct {
+        syntax: '<integer>';
+        inherits: false;
+        initial-value: 100;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body,
+      #root {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      html,
+      body {
+        width: 100%;
+      }
+
+      body {
+        font-family: Manrope, system-ui, sans-serif;
+      }
+
+      .focus {
+        --focus-cream: #fff6ea;
+        --focus-ink: #120406;
+        --focus-accent: #ffd84a;
+        --focus-red: #8c0d1a;
+        --focus-ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --focus-ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+        --focus-gutter: 16px;
+        --dir: 1;
+        --glow-x: 50%;
+        --glow-y: 36%;
+
+        /* Photo frame width; height follows the photo's own ratio. */
+        --ratio: 0.8;
+        --card-w: min(74vw, 22rem, calc(44vh * var(--ratio)));
+        --card-w: min(74vw, 22rem, calc(44svh * var(--ratio)));
+        --from-x: -56vw;
+
+        /* Default timeline (the startup sets its own in .focus--intro). */
+        --t-in: 0ms;         --d-in: 1150ms;
+        --d-guide: 650ms;
+        --t-trails: 380ms;   --d-trails: 520ms;
+        --t-lock: 1150ms;    --d-lock: 500ms;
+        --t-title: 1350ms;   --d-title: 800ms;
+        --t-scribble: 1950ms;
+        --t-meter: 1700ms;
+        --t-fill: 2000ms;    --d-fill: 1800ms;
+        --t-rush: 2000ms;
+        --t-push: 2000ms;    --d-push: 1800ms;
+        --t-ready: 3800ms;
+        --d-small: 520ms;
+
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        isolation: isolate;
+        color: var(--focus-cream);
+        font-family: Manrope, system-ui, sans-serif;
+      }
+
+      /* Enter study mode: the continuation (~1.65 s), mirrored. */
+      .focus--enter {
+        --dir: -1;
+        --ratio: 0.667;
+        /* Starts fully off-screen: it enters only once the panels have closed. */
+        --from-x: 100vw;
+
+        --t-in: 300ms;       --d-in: 780ms;
+        --d-guide: 420ms;
+        --t-trails: 560ms;   --d-trails: 380ms;
+        --t-lock: 700ms;     --d-lock: 380ms;
+        --t-title: 720ms;    --d-title: 600ms;
+        --t-scribble: 1080ms;
+        --t-meter: 880ms;
+        --t-fill: 1050ms;    --d-fill: 500ms;
+        --t-rush: 1000ms;
+        --t-push: 1150ms;    --d-push: 450ms;
+        --t-ready: 1550ms;
+        --d-small: 380ms;
+      }
+
+      :where(.focus) p {
+        margin: 0;
+      }
+
+      :where(.focus) svg {
+        display: block;
+        overflow: visible;
+      }
+
+      .focus__bg {
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background:
+          radial-gradient(60% 55% at var(--glow-x) var(--glow-y), #a8121f 0%, transparent 75%),
+          linear-gradient(160deg, #8c0d1a 0%, #6a0913 60%, #4c060e 100%);
+      }
+
+      /* Enter: two panels close toward the centre, then the scene settles in. */
+      .focus__door {
+        display: none;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        z-index: -3;
+        width: 50.5%;
+        background: var(--focus-red);
+      }
+
+      .focus--enter .focus__door {
+        display: block;
+        animation: focus-door 360ms cubic-bezier(0.76, 0, 0.24, 1) 20ms both;
+      }
+
+      .focus__door--l {
+        left: 0;
+        --door-from: -100%;
+        box-shadow: inset -2px 0 0 var(--focus-cream);
+      }
+
+      .focus__door--r {
+        right: 0;
+        --door-from: 100%;
+        box-shadow: inset 2px 0 0 var(--focus-cream);
+      }
+
+      .focus--enter .focus__bg {
+        animation: focus-fade 180ms linear 330ms both;
+      }
+
+      /* ---------- Stage ---------- */
+
+      .focus__stage {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding:
+          max(48px, env(safe-area-inset-top))
+          max(var(--focus-gutter), env(safe-area-inset-right))
+          max(32px, env(safe-area-inset-bottom))
+          max(var(--focus-gutter), env(safe-area-inset-left));
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: calc(16px + clamp(1rem, 3.4vh, 2rem));
+      }
+
+      .focus__media {
+        position: relative;
+        flex: none;
+        width: var(--card-w);
+      }
+
+      /* Hairline the photo travels along. */
+      .focus__guide {
+        position: absolute;
+        top: 50%;
+        left: -150vw;
+        z-index: -1;
+        width: 300vw;
+        height: 1px;
+        background: rgba(255, 246, 234, 0.16);
+        transform-origin: calc(50% - 50% * var(--dir)) 50%;
+        animation: focus-draw-x var(--d-guide) var(--focus-ease) var(--t-in) both;
+      }
+
+      /* Directional lines rushing into the photo while focus builds. */
+      .focus__rush span {
+        position: absolute;
+        z-index: -1;
+        top: var(--y);
+        right: calc(100% + 14px);
+        width: clamp(4rem, 16vw, 14rem);
+        height: 2px;
+        border-radius: 2px;
+        background: linear-gradient(calc(-90deg * var(--dir)), rgba(255, 246, 234, 0.75), rgba(255, 246, 234, 0));
+        opacity: 0;
+        animation: focus-rush 900ms cubic-bezier(0.5, 0, 0.75, 0) calc(var(--t-rush) + var(--o)) 2;
+      }
+
+      .focus--enter .focus__rush span {
+        right: auto;
+        left: calc(100% + 14px);
+        animation-iteration-count: 1;
+        animation-duration: 600ms;
+      }
+
+      .focus__rush span:nth-child(1) { --y: 18%; --o: 0ms; }
+      .focus__rush span:nth-child(2) { --y: 44%; --o: 240ms; }
+      .focus__rush span:nth-child(3) { --y: 66%; --o: 120ms; }
+      .focus__rush span:nth-child(4) { --y: 86%; --o: 380ms; }
+
+      /* The travelling photo: fast entry, overshoot, rotation correction. */
+      .focus__mover {
+        position: relative;
+        z-index: 1;
+        rotate: calc(-2deg * var(--dir));
+        animation: focus-travel var(--d-in) linear var(--t-in) both;
+      }
+
+      .focus__trails span {
+        position: absolute;
+        top: var(--y);
+        right: calc(100% + 10px);
+        width: var(--w);
+        height: var(--h, 2px);
+        border-radius: 2px;
+        background: linear-gradient(calc(-90deg * var(--dir)), rgba(255, 246, 234, 0.8), rgba(255, 246, 234, 0));
+        transform-origin: calc(50% + 50% * var(--dir)) 50%;
+        opacity: 0;
+        animation: focus-trail var(--d-trails) var(--focus-ease) var(--t-trails) both;
+      }
+
+      .focus--enter .focus__trails span {
+        right: auto;
+        left: calc(100% + 10px);
+      }
+
+      .focus__trails span:nth-child(1) { --y: 22%; --w: 120%; }
+      .focus__trails span:nth-child(2) { --y: 52%; --w: 75%; --h: 3px; }
+      .focus__trails span:nth-child(3) { --y: 79%; --w: 100%; }
+
+      /* Focus builds: the photo pushes toward the viewer. */
+      .focus__push {
+        position: relative;
+        scale: 1.04;
+        animation: focus-push var(--d-push) var(--focus-ease-io) var(--t-push) both;
+      }
+
+      .focus__card {
+        position: relative;
+        margin: 0;
+        padding: 6px;
+        border-radius: 6px;
+        background: #ffffff;
+        box-shadow:
+          0 0 0 2px var(--focus-ink),
+          calc(10px * var(--dir)) 12px 0 2px rgba(20, 2, 6, 0.5),
+          0 30px 60px -22px rgba(0, 0, 0, 0.55);
+      }
+
+      .focus__card img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 2px;
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      /* Focus frame: locks on, then tightens as focus builds. */
+      .focus__brackets {
+        --c: var(--focus-cream);
+        --l: 28px;
+        --s: 2.5px;
+        position: absolute;
+        inset: -16px;
+        pointer-events: none;
+        background:
+          linear-gradient(var(--c), var(--c)) top left / var(--l) var(--s),
+          linear-gradient(var(--c), var(--c)) top left / var(--s) var(--l),
+          linear-gradient(var(--c), var(--c)) top right / var(--l) var(--s),
+          linear-gradient(var(--c), var(--c)) top right / var(--s) var(--l),
+          linear-gradient(var(--c), var(--c)) bottom left / var(--l) var(--s),
+          linear-gradient(var(--c), var(--c)) bottom left / var(--s) var(--l),
+          linear-gradient(var(--c), var(--c)) bottom right / var(--l) var(--s),
+          linear-gradient(var(--c), var(--c)) bottom right / var(--s) var(--l);
+        background-repeat: no-repeat;
+        animation:
+          focus-lock var(--d-lock) var(--focus-ease) var(--t-lock) both,
+          focus-tighten var(--d-push) var(--focus-ease-io) var(--t-push) both;
+      }
+
+      /* The one confirmation: the frame rings outward once. */
+      .focus__ring {
+        position: absolute;
+        inset: -16px;
+        border: 2px solid var(--focus-accent);
+        border-radius: 4px;
+        opacity: 0;
+        pointer-events: none;
+        animation: focus-ring 720ms var(--focus-ease) var(--t-ready) forwards;
+      }
+
+      /* ---------- Copy ---------- */
+
+      .focus__copy {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 0;
+        max-width: 100%;
+        text-align: center;
+      }
+
+      .focus__title {
+        position: relative;
+        margin: 0 0 0.16em;
+        font-family: 'Instrument Serif', 'Times New Roman', Georgia, serif;
+        font-weight: 400;
+        font-size: clamp(2.6rem, 13vw, 4.2rem);
+        line-height: 0.88;
+        letter-spacing: -0.012em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .focus__line {
+        display: block;
+        overflow: hidden;
+        margin-inline: -0.1em;
+        padding: 0.04em 0.1em 0.07em;
+      }
+
+      .focus__line > span {
+        display: inline-block;
+        animation: focus-line var(--d-title) var(--focus-ease) var(--t-title) both;
+      }
+
+      .focus__line:nth-child(2) > span {
+        animation-delay: calc(var(--t-title) + 120ms);
+      }
+
+      .focus__title em {
+        font-style: italic;
+      }
+
+      .focus__dot {
+        font-style: normal;
+        color: var(--focus-ink);
+      }
+
+      .focus__scribble {
+        position: absolute;
+        left: 50%;
+        bottom: -0.12em;
+        width: 2.9em;
+        translate: -50% 0;
+        color: rgba(255, 246, 234, 0.75);
+        pointer-events: none;
+      }
+
+      .focus__scribble path {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 0;
+        animation: focus-stroke 520ms var(--focus-ease-io) var(--t-scribble) both;
+      }
+
+      /* Compact meter: LABEL ─────── 72% */
+      .focus__meter {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        margin-top: clamp(1rem, 2.6vh, 1.6rem);
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        animation: focus-rise var(--d-small) var(--focus-ease) var(--t-meter) both;
+      }
+
+      .focus__swap {
+        display: inline-grid;
+        overflow: hidden;
+        text-align: left;
+      }
+
+      .focus__swap > span {
+        grid-area: 1 / 1;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .focus__swap > span::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        flex: none;
+        background: currentColor;
+      }
+
+      .focus__swap-from {
+        opacity: 0;
+        translate: 0 -110%;
+        animation: focus-swap-out 260ms var(--focus-ease) var(--t-ready) both;
+      }
+
+      .focus__swap-to {
+        animation: focus-swap-in 360ms var(--focus-ease) calc(var(--t-ready) + 40ms) both;
+      }
+
+      .focus__swap-to::before {
+        background: var(--focus-accent);
+      }
+
+      .focus__track {
+        position: relative;
+        width: clamp(4.5rem, 12vw, 10rem);
+        height: 2px;
+        background: rgba(255, 246, 234, 0.25);
+        transform-origin: left center;
+        animation: focus-draw-x 500ms var(--focus-ease) calc(var(--t-meter) + 100ms) both;
+      }
+
+      .focus__fill {
+        position: absolute;
+        inset: -0.5px 0;
+        background: var(--focus-accent);
+        transform-origin: left center;
+        animation: focus-fill var(--d-fill) linear var(--t-fill) both;
+      }
+
+      .focus__pct {
+        --focus-pct: 100;
+        min-width: 4ch;
+        font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+        text-align: right;
+        counter-reset: focus-pct var(--focus-pct);
+        animation: focus-pct var(--d-fill) linear var(--t-fill) both;
+      }
+
+      .focus__pct::after {
+        content: counter(focus-pct) '%';
+      }
+
+      /* Arrival: the last frame of "Enter study mode" held over the page that
+         was entered, opening up while it fades. */
+      .focus--settled,
+      .focus--settled * {
+        animation: none !important;
+      }
+
+      .focus--settled .focus__push {
+        animation: focus-expand 520ms var(--focus-ease) both !important;
+      }
+
+      /* =======================================================
+         Page-entry overlay
+         ======================================================= */
+
+      .splash {
+        position: fixed;
+        z-index: 99999;
+      }
+
+      /* -------------------------------------------------------
+         Startup: FOCUS MODE ACTIVATION (focus-mode.jpg)
+         0.0  photo already travelling in from the left
+         0.8  brackets lock · MODE 01 · NORMAL
+         1.2  "Semester Study." → "Focus Mode." · MODE 02 · FOCUS
+         1.8  FOCUSING 0 → 100 % · photo pushes in · brackets tighten
+         3.8  focus lock: one snap + one ring · ✓ FOCUS READY
+         4.2  photo accelerates off to the right, the layer wipes away
+         ------------------------------------------------------- */
+      .focus--intro {
+        --focus-accent: var(--focus-cream);
+
+        --t-in: 0ms;         --d-in: 900ms;
+        --d-guide: 600ms;
+        --t-trails: 250ms;   --d-trails: 520ms;
+        --t-lock: 800ms;     --d-lock: 420ms;
+        --t-mode: 850ms;
+        --t-mode-swap: 1550ms;
+        --t-title: 650ms;    --d-title: 600ms;
+        --t-swap-title: 1200ms;
+        --t-scribble: 1750ms;
+        --t-meter: 1700ms;
+        --t-fill: 1800ms;    --d-fill: 2000ms;
+        --t-rush: 1900ms;
+        --t-push: 1800ms;    --d-push: 2000ms;
+        --t-ready: 3800ms;
+      }
+
+      /* The lock: one short snap of the whole photo frame. */
+      .focus--intro .focus__mover {
+        animation:
+          focus-travel var(--d-in) linear var(--t-in) both,
+          intro-snap 280ms cubic-bezier(0.3, 0, 0.2, 1) var(--t-ready);
+      }
+
+      /* Mode readout above the frame: NORMAL → FOCUS. */
+      .focus__mode {
+        --t-ready: var(--t-mode-swap);
+        position: absolute;
+        bottom: calc(100% + 26px);
+        left: -16px;
+        z-index: 2;
+        font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        animation: focus-rise 420ms var(--focus-ease) var(--t-mode) both;
+      }
+
+      .focus__mode .focus__swap-from {
+        color: rgba(255, 246, 234, 0.7);
+      }
+
+      /* Title lines swap in place: the old word leaves, the new one rises. */
+      .focus__line--swap {
+        display: grid;
+      }
+
+      .focus__line--swap > span {
+        grid-area: 1 / 1;
+      }
+
+      .focus--intro .focus__line > .focus__was {
+        animation:
+          focus-line var(--d-title) var(--focus-ease) var(--t-title) both,
+          intro-line-out 260ms cubic-bezier(0.6, 0, 0.8, 0.4) var(--t-swap-title) forwards;
+      }
+
+      .focus--intro .focus__line:nth-child(2) > .focus__was {
+        animation:
+          focus-line var(--d-title) var(--focus-ease) calc(var(--t-title) + 110ms) both,
+          intro-line-out 260ms cubic-bezier(0.6, 0, 0.8, 0.4) calc(var(--t-swap-title) + 60ms) forwards;
+      }
+
+      /* The new word only rises once the old one has fully left its line. */
+      .focus--intro .focus__line > .focus__now {
+        animation: focus-line 560ms var(--focus-ease) calc(var(--t-swap-title) + 270ms) both;
+      }
+
+      .focus--intro .focus__line:nth-child(2) > .focus__now {
+        animation-delay: calc(var(--t-swap-title) + 340ms);
+      }
+
+      .focus--intro .focus__meter .focus__swap-to::before {
+        display: none;
+      }
+
+      .focus__check {
+        width: 0.95em;
+        height: 0.95em;
+        flex: none;
+      }
+
+      /* Exit: a small wind-up, then the photo accelerates off to the right;
+         the red layer wipes away behind it to reveal the landing page. */
+      .splash.is-leaving {
+        pointer-events: none;
+        animation: focus-exit 650ms cubic-bezier(0.65, 0, 0.35, 1) 150ms forwards;
+      }
+
+      .splash.is-leaving .focus__mover {
+        animation: intro-exit-photo 640ms cubic-bezier(0.5, 0, 0.9, 0.35) forwards;
+      }
+
+      .splash.is-leaving .focus__trails span {
+        animation: intro-exit-trail 640ms ease-in forwards;
+      }
+
+      .splash.is-leaving .focus__copy,
+      .splash.is-leaving .focus__mode {
+        animation: intro-exit-copy 420ms cubic-bezier(0.5, 0, 0.9, 0.35) forwards;
+      }
+
+      /* =======================================================
+         Layouts
+         ======================================================= */
+
+      @media (min-width: 600px) {
+        .focus {
+          --focus-gutter: 28px;
+          --card-w: min(54vw, 26rem, calc(48vh * var(--ratio)));
+          --card-w: min(54vw, 26rem, calc(48svh * var(--ratio)));
+        }
+
+        .focus__title {
+          font-size: clamp(3.4rem, 10vw, 5.5rem);
+        }
+      }
+
+      /* Landscape screens: horizontal composition, photo and type apart.
+         Startup: photo left, type right. Enter: mirrored. */
+      @media (min-width: 900px) and (min-aspect-ratio: 1/1),
+        (orientation: landscape) and (max-height: 540px) {
+        .focus {
+          --focus-gutter: clamp(20px, 3vw, 48px);
+          --glow-x: 30%;
+          --glow-y: 50%;
+          --card-w: min(38vw, 32rem, calc(70vh * var(--ratio)));
+          --card-w: min(38vw, 32rem, calc(70svh * var(--ratio)));
+          --from-x: -32vw;
+        }
+
+        .focus--enter {
+          --glow-x: 70%;
+          --from-x: 50vw;
+        }
+
+        .focus__stage {
+          display: grid;
+          grid-template-columns: var(--card-w) minmax(0, 30rem);
+          align-items: center;
+          justify-content: center;
+          gap: clamp(3rem, 8vw, 9rem);
+        }
+
+        .focus--enter .focus__stage {
+          grid-template-columns: minmax(0, 30rem) var(--card-w);
+        }
+
+        .focus--enter .focus__media {
+          grid-area: 1 / 2;
+        }
+
+        .focus--enter .focus__copy {
+          grid-area: 1 / 1;
+          align-items: flex-end;
+          text-align: right;
+        }
+
+        .focus__copy {
+          align-items: flex-start;
+          text-align: left;
+        }
+
+        .focus__title {
+          font-size: clamp(3rem, min(8vw, 14vh), 8.5rem);
+          font-size: clamp(3rem, min(8vw, 14svh), 8.5rem);
+        }
+
+        .focus__scribble {
+          left: 0.02em;
+          translate: none;
+        }
+
+        .focus--enter .focus__scribble {
+          left: auto;
+          right: 0.02em;
+        }
+
+        .focus__meter {
+          font-size: 0.8rem;
+        }
+
+        .focus__track {
+          width: clamp(6rem, 12vw, 12rem);
+        }
+
+        .focus--intro {
+          --glow-x: 50%;
+          --from-x: -52vw;
+        }
+
+        .focus--intro .focus__stage {
+          grid-template-columns: minmax(0, 1fr) var(--card-w) minmax(0, 1fr);
+          justify-content: stretch;
+          column-gap: clamp(2rem, 4vw, 4.5rem);
+        }
+
+        .focus--intro .focus__media {
+          grid-column: 2;
+        }
+
+        .focus--intro .focus__copy {
+          grid-column: 3;
+          justify-self: start;
+        }
+
+        .focus--intro .focus__title {
+          font-size: clamp(2.6rem, min(6vw, 12vh), 6.5rem);
+          font-size: clamp(2.6rem, min(6vw, 12svh), 6.5rem);
+        }
+
+        .focus--intro .focus__meter {
+          font-size: 0.74rem;
+        }
+
+        .focus--intro .focus__track {
+          width: clamp(4rem, 7vw, 8rem);
+        }
+      }
+
+      @media (orientation: landscape) and (max-height: 540px) {
+        .focus {
+          --card-w: min(36vw, calc(64vh * var(--ratio)));
+          --card-w: min(36vw, calc(64svh * var(--ratio)));
+        }
+
+        .focus__stage {
+          padding-top: max(24px, env(safe-area-inset-top));
+          padding-bottom: max(24px, env(safe-area-inset-bottom));
+          gap: clamp(2.5rem, 7vw, 5rem);
+        }
+
+        .focus__title {
+          font-size: clamp(2.2rem, 13vh, 3.8rem);
+        }
+      }
+
+      /* =======================================================
+         Keyframes
+         ======================================================= */
+
+      @keyframes focus-fade {
+        from {
+          opacity: 0;
+        }
+      }
+
+      @keyframes focus-rise {
+        from {
+          opacity: 0;
+          translate: 0 12px;
+        }
+      }
+
+      @keyframes focus-door {
+        from {
+          translate: var(--door-from) 0;
+        }
+      }
+
+      @keyframes focus-draw-x {
+        from {
+          scale: 0 1;
+        }
+      }
+
+      /* Physical arrival: fast travel, overshoot, settle. */
+      @keyframes focus-travel {
+        0% {
+          translate: var(--from-x) 0;
+          rotate: calc(7deg * var(--dir));
+          scale: 0.94;
+          animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1);
+        }
+
+        52% {
+          translate: calc(3% * var(--dir)) 0;
+          rotate: calc(-4deg * var(--dir));
+          scale: 1.015;
+          animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
+        }
+
+        76% {
+          translate: calc(-0.8% * var(--dir)) 0;
+          rotate: calc(-1.4deg * var(--dir));
+          scale: 0.998;
+          animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
+        }
+
+        100% {
+          translate: 0 0;
+          rotate: calc(-2deg * var(--dir));
+          scale: 1;
+        }
+      }
+
+      @keyframes focus-trail {
+        from {
+          opacity: 1;
+          scale: 1 1;
+        }
+
+        to {
+          opacity: 0;
+          scale: 0 1;
+        }
+      }
+
+      @keyframes focus-rush {
+        0% {
+          opacity: 0;
+          translate: calc(-36vw * var(--dir)) 0;
+        }
+
+        30% {
+          opacity: 0.8;
+        }
+
+        100% {
+          opacity: 0;
+          translate: 0 0;
+        }
+      }
+
+      @keyframes focus-push {
+        from {
+          scale: 1;
+        }
+      }
+
+      @keyframes focus-lock {
+        from {
+          opacity: 0;
+          scale: 1.3;
+        }
+      }
+
+      @keyframes focus-tighten {
+        from {
+          transform: scale(1.06);
+        }
+      }
+
+      @keyframes focus-ring {
+        from {
+          opacity: 1;
+          scale: 1;
+        }
+
+        to {
+          opacity: 0;
+          scale: 1.22 1.15;
+        }
+      }
+
+      @keyframes focus-line {
+        from {
+          translate: 0 112%;
+        }
+      }
+
+      @keyframes focus-stroke {
+        0% {
+          stroke-dashoffset: 1;
+          opacity: 0;
+        }
+
+        8% {
+          opacity: 1;
+        }
+
+        100% {
+          stroke-dashoffset: 0;
+          opacity: 1;
+        }
+      }
+
+      @keyframes focus-swap-out {
+        from {
+          opacity: 1;
+          translate: 0 0;
+        }
+      }
+
+      @keyframes focus-swap-in {
+        from {
+          opacity: 0;
+          translate: 0 110%;
+        }
+      }
+
+      @keyframes focus-fill {
+        0% {
+          scale: 0 1;
+          animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+        }
+
+        40% {
+          scale: 0.46 1;
+          animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+        }
+
+        75% {
+          scale: 0.85 1;
+          animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+        }
+
+        100% {
+          scale: 1 1;
+        }
+      }
+
+      /* Same stops and curves as focus-fill, so the number matches the line. */
+      @keyframes focus-pct {
+        0% {
+          --focus-pct: 0;
+          animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+        }
+
+        40% {
+          --focus-pct: 46;
+          animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+        }
+
+        75% {
+          --focus-pct: 85;
+          animation-timing-function: cubic-bezier(0.45, 0, 0.4, 1);
+        }
+
+        100% {
+          --focus-pct: 100;
+        }
+      }
+
+      @keyframes focus-expand {
+        from {
+          scale: 1.04;
+        }
+
+        to {
+          scale: 1.12;
+        }
+      }
+
+      @keyframes focus-exit {
+        from {
+          clip-path: inset(0 0 0 0);
+        }
+
+        to {
+          clip-path: inset(0 0 0 100%);
+        }
+      }
+
+      @keyframes intro-snap {
+        0% {
+          scale: 1;
+        }
+
+        35% {
+          scale: 1.045;
+        }
+
+        100% {
+          scale: 1;
+        }
+      }
+
+      @keyframes intro-line-out {
+        to {
+          translate: 0 -112%;
+        }
+      }
+
+      @keyframes intro-exit-photo {
+        0% {
+          translate: 0 0;
+          rotate: -2deg;
+        }
+
+        22% {
+          translate: -2.5% 0;
+          rotate: -3.5deg;
+        }
+
+        100% {
+          translate: calc(50vw + 75%) 0;
+          rotate: 5deg;
+        }
+      }
+
+      @keyframes intro-exit-trail {
+        0% {
+          opacity: 0;
+          scale: 0 1;
+        }
+
+        30% {
+          opacity: 1;
+          scale: 1 1;
+        }
+
+        100% {
+          opacity: 0.9;
+          scale: 1.8 1;
+        }
+      }
+
+      @keyframes intro-exit-copy {
+        to {
+          opacity: 0;
+          translate: 10vw 0;
+        }
+      }
+
+      @keyframes intro-fade-out {
+        to {
+          opacity: 0;
+        }
+      }
+
+      @keyframes focus-exit-fade {
+        to {
+          opacity: 0;
+          visibility: hidden;
+        }
+      }
+
+      /* =======================================================
+         Reduced motion: no travel, no rotation, no lines.
+         The photo is in place from the first frame; text and the
+         meter use short fades, and the meter still fills.
+         ======================================================= */
+
+      @media (prefers-reduced-motion: reduce) {
+        .focus__mover,
+        .focus__push,
+        .focus__brackets {
+          animation: none;
+          rotate: none;
+          scale: none;
+        }
+
+        .focus__guide,
+        .focus__rush,
+        .focus__trails,
+        .focus__ring,
+        .focus__door {
+          display: none !important;
+        }
+
+        .focus--enter .focus__bg {
+          animation: none;
+        }
+
+        .focus__line > span,
+        .focus__meter,
+        .focus__swap-to {
+          animation-name: focus-fade;
+        }
+
+        .focus__swap-from,
+        .focus__swap-to {
+          translate: none;
+        }
+
+        .focus--settled .focus__push {
+          animation: none !important;
+        }
+
+        .splash.is-leaving {
+          animation: focus-exit-fade 450ms ease forwards;
+        }
+
+        .focus--intro .focus__mover {
+          animation: none;
+        }
+
+        .focus--intro .focus__mode {
+          animation-name: focus-fade;
+        }
+
+        .focus--intro .focus__line > .focus__was,
+        .focus--intro .focus__line:nth-child(2) > .focus__was {
+          animation:
+            focus-fade 400ms ease var(--t-title) both,
+            intro-fade-out 250ms ease var(--t-swap-title) forwards;
+        }
+
+        .focus--intro .focus__line > .focus__now,
+        .focus--intro .focus__line:nth-child(2) > .focus__now {
+          animation: focus-fade 400ms ease calc(var(--t-swap-title) + 150ms) both;
+        }
+
+        .splash.is-leaving .focus__mover,
+        .splash.is-leaving .focus__copy,
+        .splash.is-leaving .focus__mode,
+        .splash.is-leaving .focus__trails span {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!--
+      =======================================================
+      SEMESTER STUDY — STARTUP: FOCUS MODE ACTIVATION
+      =======================================================
+      Plain HTML so it paints before React/Vite finishes mounting.
+      src/splash.js starts the exit at 4.2 s; it plays on every page load.
+    -->
+    <div
+      id="splash"
+      class="splash focus focus--intro"
+      role="status"
+      aria-label="Loading Semester Study"
+    >
+      <span class="focus__bg" aria-hidden="true"></span>
+
+      <div class="focus__stage" aria-hidden="true">
+        <div class="focus__media">
+          <span class="focus__guide"></span>
+          <div class="focus__rush">
+            <span></span><span></span><span></span><span></span>
+          </div>
+
+          <p class="focus__mode">
+            <span class="focus__swap">
+              <span class="focus__swap-from">Mode 01 · Normal</span>
+              <span class="focus__swap-to">Mode 02 · Focus</span>
+            </span>
+          </p>
+
+          <div class="focus__mover">
+            <div class="focus__trails">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="focus__push">
+              <figure class="focus__card">
+                <img
+                  src="/src/assets/focus-mode.jpg"
+                  width="736"
+                  height="920"
+                  alt=""
+                  fetchpriority="high"
+                />
+              </figure>
+              <span class="focus__brackets"></span>
+              <span class="focus__ring"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="focus__copy">
+          <p class="focus__title">
+            <span class="focus__line focus__line--swap"><span class="focus__was"><em>Semester</em></span><span class="focus__now"><em>Focus</em></span></span>
+            <span class="focus__line focus__line--swap"><span class="focus__was">Study<span class="focus__dot">.</span></span><span class="focus__now">Mode<span class="focus__dot">.</span></span></span>
+            <svg class="focus__scribble" viewBox="0 0 300 24" fill="none" stroke="currentColor" stroke-linecap="round" focusable="false">
+              <path pathLength="1" stroke-width="4" d="M6 15.5C58 9.6 121 6.8 181 8.4c40 1.1 76 3.3 113 2.2" />
+            </svg>
+          </p>
+
+          <div class="focus__meter">
+            <span class="focus__swap">
+              <span class="focus__swap-from">Focusing</span>
+              <span class="focus__swap-to">
+                <svg class="focus__check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                  <path d="M3 8.5 6.5 12 13 4" />
+                </svg>
+                Focus ready
+              </span>
+            </span>
+            <span class="focus__track"><span class="focus__fill"></span></span>
+            <span class="focus__pct"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- The CSS timeline above starts now; splash.js times the exit from here. -->
+    <script>
+      document.getElementById('splash').dataset.start = performance.now()
+    </script>
+
+    <!-- React application -->
+    <div id="root"></div>
+
+    <script
+      type="module"
+      src="/src/main.jsx"
+    ></script>
+  </body>
+</html>
