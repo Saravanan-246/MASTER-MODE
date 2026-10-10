@@ -1,6 +1,7 @@
 import { Suspense, useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import Landing from './pages/Landing.jsx'
 import { Dashboard, SubjectPage, TopicPage, UnitPage } from './lib/pages.js'
 
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      <Analytics />
     </MotionConfig>
   )
 }
